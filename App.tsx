@@ -8,14 +8,18 @@ import {
   Button,
   FlatList,
 } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Key } from "react";
+
+type UsuarioData = [{ code: number; idade: number; name: string }];
 
 import * as SQLite from "expo-sqlite";
 export default function App() {
   const [name, setName] = useState<string>("");
   const [code, setCode] = useState<number | string>("");
   const [idade, setIdade] = useState<number | string>("");
+  const [data, setData] = useState<UsuarioData>();
   const database = SQLite.openDatabase("sistema.db");
+
   useEffect(() => {
     async function CreateTable() {
       await database.transaction((tx) => {
@@ -36,6 +40,51 @@ export default function App() {
     CreateTable();
   }, []);
 
+  const listar = () => {
+    async function listarTodos() {
+      try {
+        await database.transaction((tx) => {
+          tx.executeSql(
+            "SELECT * FROM usuario where code=?",
+            [code],
+            (_, { rows }: SQLite.SQLResultSet) => {
+              setData(rows._array as UsuarioData);
+              const Code = rows._array.map((obj) => obj.code);
+              if (Code[0] === undefined) {
+                alert("usuario não encontrado");
+              }
+            }
+          );
+        });
+      } catch (erro) {
+        console.log("erro ao tentar listar dados" + erro);
+        return false;
+      }
+    }
+    listarTodos();
+  };
+
+  const remover = () => {
+    async function removerData() {
+      try {
+        await database.transaction((tx) => {
+          tx.executeSql(
+            "delete from usuario where code=?",
+            [code],
+            (_, result) => {
+              console.log("usuario deletado", result);
+            }
+          );
+        });
+        return true;
+      } catch (erro) {
+        console.log("erro ao tentar deletar dados" + erro);
+        return false;
+      }
+    }
+    removerData();
+  };
+
   const cadastrar = async () => {
     async function InsertData() {
       try {
@@ -44,7 +93,7 @@ export default function App() {
             "INSERT INTO USUARIO (code,name,idade) VALUES (?,?,?)",
             [code, name, idade],
             (_, result) => {
-              console.log("dados inseridos com sucesso");
+              console.log("dados inseridos com sucesso", result);
             }
           );
         });
@@ -58,6 +107,9 @@ export default function App() {
       const sucess = await InsertData();
       if (sucess) {
         console.log("sucesso meu  amigo");
+        setName("");
+        setIdade("");
+        setCode("");
       }
     }
   };
@@ -97,9 +149,17 @@ export default function App() {
         ></TextInput>
         <View style={styles.btnview}>
           <Button title="cadastrar" onPress={cadastrar}></Button>
-          <Button title="Procurar"></Button>
-          <Button title="Remover"></Button>
+          <Button title="Procurar" onPress={listar}></Button>
+          <Button title="Remover" onPress={remover}></Button>
         </View>
+
+        <FlatList
+          data={data}
+          keyExtractor={(item) => item.code.toString()}
+          renderItem={({ item }) => {
+            return <Text key={item.code}>{item.name}</Text>;
+          }}
+        ></FlatList>
       </View>
 
       <StatusBar style="auto" hidden={true} />
@@ -114,9 +174,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    top: "20%",
+    marginTop: "20%",
   },
   main: {
+    marginTop: "20%",
     height: "100%",
     width: "100%",
     alignItems: "center",

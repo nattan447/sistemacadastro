@@ -7,20 +7,53 @@ import {
   TextInput,
   Button,
   FlatList,
+  ActivityIndicator,
+  Modal,
+  Pressable,
 } from "react-native";
 import { useState, useEffect, Key, useMemo, useRef } from "react";
+import styled from "styled-components/native";
 
 type UsuarioData = [{ code: number; idade: number; name: string }];
 
 import * as SQLite from "expo-sqlite";
 export default function App() {
+  const ButtonText = styled.Text`
+    font-size: 16px;
+    color: white;
+  `;
+  const Buttonn = styled.TouchableHighlight`
+    background-color: red;
+    width: 100px;
+    height: 34px;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+    shadow-color: black;
+    shadow-offset: 19px 20px;
+    shadow-opacity: 0.1;
+    margin-top: 20px;
+  `;
+
+  const ViewModal = styled.View`
+    flex: 1;
+    background-color: #f8f8f8;
+    align-items: center;
+  `;
   const [name, setName] = useState<string>("");
   const [code, setCode] = useState<string>("");
   const [idade, setIdade] = useState<string>("");
   const [data, setData] = useState<UsuarioData>();
-  const hascode = useRef<boolean>(false);
+  const [dataModal, setDataModal] = useState<UsuarioData>();
+  const [showModel, setShowModel] = useState(false);
+
+  const [isloading, setIsloading] = useState(true);
   const database = SQLite.openDatabase("sistema.db");
   useEffect(() => {
+    setTimeout(() => {
+      setIsloading(false);
+    }, 3000);
+
     async function CreateTable() {
       await database.transaction((tx) => {
         tx.executeSql(
@@ -39,8 +72,29 @@ export default function App() {
     }
     CreateTable();
   }, []);
+  const listAll = async () => {
+    try {
+      await database.transaction((tx) => {
+        tx.executeSql(
+          "SELECT * FROM usuario  ",
+          [],
+          (_, { rows }: SQLite.SQLResultSet) => {
+            console.log(rows._array);
+            setDataModal(rows._array as UsuarioData);
+            const Code = rows._array.map((obj) => obj.code);
+            if (Code[0] === undefined) {
+              alert("usuario não encontrado");
+            }
+          }
+        );
+      });
 
-  const listar = async () => {
+      setShowModel(true);
+    } catch {
+      console.log("erro ao fazer a listagem");
+    }
+  };
+  const listarCode = async () => {
     const listCode = async () =>
       await database.transaction((tx) => {
         tx.executeSql(
@@ -176,10 +230,57 @@ export default function App() {
           ></TextInput>
         </View>
         <View style={styles.btnview}>
-          <Button title="cadastrar" onPress={cadastrar}></Button>
-          <Button title="Procurar" onPress={listar}></Button>
-          <Button title="Remover" onPress={remover}></Button>
+          <Buttonn onPress={cadastrar}>
+            <ButtonText>cadastrar</ButtonText>
+          </Buttonn>
+          <Buttonn>
+            <ButtonText onPress={listarCode}> procurar</ButtonText>
+          </Buttonn>
+          <Buttonn onPress={remover}>
+            <ButtonText> remover</ButtonText>
+          </Buttonn>
         </View>
+
+        <Buttonn onPress={listAll}>
+          <ButtonText>listar todos</ButtonText>
+        </Buttonn>
+        <Modal
+          visible={showModel}
+          animationType="slide"
+          presentationStyle="overFullScreen"
+          onRequestClose={() => setShowModel(false)}
+        >
+          <ViewModal>
+            <FlatList
+              style={{ width: "100%" }}
+              data={dataModal}
+              keyExtractor={(item) => item.code.toString()}
+              renderItem={({ item }) => {
+                return (
+                  <View
+                    style={{
+                      width: "100%",
+                      height: 37,
+                      marginTop: "10%",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text
+                      key={item.code}
+                      style={{ fontSize: 16, color: "red" }}
+                    >
+                      {item.name}
+                    </Text>
+                  </View>
+                );
+              }}
+            ></FlatList>
+            <Buttonn onPress={() => setShowModel(false)}>
+              <ButtonText>fechar model</ButtonText>
+            </Buttonn>
+          </ViewModal>
+        </Modal>
 
         <View style={{ width: "100%", alignItems: "center", paddingTop: 50 }}>
           <Text style={{ color: "#607D8B", fontSize: 26, fontWeight: "bold" }}>
@@ -190,6 +291,7 @@ export default function App() {
             data={data}
             keyExtractor={(item) => item.code.toString()}
             renderItem={({ item }) => {
+              console.log("itens da flatlist" + item);
               return (
                 <View
                   style={{
